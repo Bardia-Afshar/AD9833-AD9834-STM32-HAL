@@ -1,40 +1,136 @@
-# AD9833-STM32
-A Simple Library for AD9833 based on STM32
+# AD983x DDS Library for STM32 (HAL)
 
-This is a library for AD9833 DDS Chip from Analog Devices.
+## UPDATED - 2026
 
-For my project, I used STM32F030F4P6 and HAL libraries based on STM32CubeMX. I tried to write the library simple so as you can port it on other microcontrollers. It uses Software-Based SPI, so you do not need to configure SPI registers on your microcontroller. I tested it in IAR for ARM and Eclipse with GCC-ARM, and it worked fine. Moreover, I used FREQ0 and PHASE0 Register of AD9833. You can easily change it to FREQ1 and PHASE1 if you need it.
+A lightweight STM32 HAL driver for the Analog Devices **AD9833** and **AD9834** Direct Digital Synthesis (DDS) waveform generators.
 
+This library allows an STM32 microcontroller to configure and control the DDS chip over SPI. Both hardware SPI and software (bit-banged) SPI are supported. The driver provides control over waveform generation, output frequency, phase settings, and power/sleep modes.
 
-
-
-[AD9833 DATASHEET](https://www.analog.com/media/en/technical-documentation/data-sheets/AD9833.pdf)
-
-[AD9833 Application Note](https://www.analog.com/media/en/technical-documentation/application-notes/AN-1070.pdf)
-
-## How to use
-You have to allocate 3 GPIOs of your controller. In my case, I used PA5, PA6 and PA7, and I configured them as output in STM32CubeMX. After that, you have to define output pins in AD9833.h.
-
-![2020-05-19_143422](https://user-images.githubusercontent.com/54714609/82322492-d9489b80-99eb-11ea-981f-019835446b26.jpg)
-![2020-05-19_143603](https://user-images.githubusercontent.com/54714609/82322499-dbaaf580-99eb-11ea-832a-74b28b01ef15.jpg)
+<p align="center">
+  <img src="examples/SINE.png" width="260">
+  <img src="examples/TRI.png" width="260">
+  <img src="examples/AD9834_SINE_SQR.jpg" width="260">
+</p>
 
 
-There are three functions to change the behavior of AD9833 that you can use :
 
-```C
-void AD9833_Init(uint16_t Wave,float FRQ,float Phase);   // Initializing AD9833
-void AD9833_SetWave(uint16_t Wave);                      // Sets Output Wave Type
-void AD9833_SetWaveData(float Frequency,float Phase);    // Sets Wave Frequency & Phase
+---
+
+## Supported Devices
+
+### Microcontrollers
+- STM32 microcontrollers using the STM32 HAL library
+
+### DDS Devices
+- Analog Devices **AD9833**
+- Analog Devices **AD9834**
+
+---
+
+## Features
+
+- Supports AD9833 and AD9834
+- Compatible with STM32 HAL
+- Hardware SPI or software SPI
+- Frequency control using the 28-bit tuning word
+- Phase control using the 12-bit phase register
+- Frequency register switching for FSK-style operation
+- Sine, triangle, and square waveform generation
+- Separate digital output control for AD9834 SIGN BIT OUT
+- Sleep and DAC power-down modes
+
+---
+
+## Supported Waveforms
+
+| Waveform | AD9833 | AD9834 |
+|:--------:|:------:|:------:|
+| Sine     | Yes    | Yes    |
+| Triangle | Yes    | Yes    |
+| Square   | Yes    | Yes    |
+
+
+---
+
+
+
+## Example Usage
+
+### Create and configure the device handle
+```c
+static AD983x_Handle_t ad9833_dds = {
+    .gpioPort                     = GPIOA,                     /* GPIO port used for DDS control pins              */
+    .serialDataGpioPin            = GPIO_PIN_7,                /* SDATA: serial data line to the DDS               */
+    .serialClockGpioPin           = GPIO_PIN_5,                /* SCLK: serial clock for shifting data             */
+    .frameSyncGpioPin             = GPIO_PIN_0,                /* FSYNC: frame sync / chip select for DDS          */
+    .spiHandle                    = &hspi1,                    /* Hardware SPI handle (NULL for software SPI)      */
+    .masterClockFrequencyHz       = 25000000u,                 /* 25 MHz MCLK input provided to AD9833             */
+    .currentWaveformType          = AD983X_WAVE_SINE,          /* Default waveform output (sine wave)              */
+    .activeFrequencyRegister      = AD983X_REG_0,              /* Currently selected frequency register (FREQ0)    */
+    .activePhaseRegister          = AD983X_REG_0,              /* Currently selected phase register (PHASE0)       */
+    .sleep1BitState               = AD983X_SLEEP_DISABLED,     /* DAC sleep control bit state                      */
+    .sleep12BitState              = AD983X_SLEEP_DISABLED,     /* Master clock / internal sleep control            */
+    .deviceType                   = AD983X_DEVICE_AD9833,      /* Specifies the DDS device type                    */
+    .frequencyHz                  = { 0u, 0u },                /* Stored frequencies for FREQ0 and FREQ1 registers */
+    .phaseDeg                     = { 0u, 0u },                /* Stored phases for PHASE0 and PHASE1 registers    */
+};
 ```
-## Note
-Regarding the fact that this library uses a delay to execute software SPI, it can act differently with different microcontrollers. It depends on the master clock on your uC. If this library did not work for you, you have to change delay times in Write SPI function. You can do this with trial and error by adding some assembly nopes. Of course, you can use hardware SPI and add your functions to the library to avoid timing problems.
 
+### Initialization
 
+```c
+AD983x_Init(&dds, AD983X_WAVE_SINE, 1000, 0);
+```
 
-## Test Results
+### Change frequency
 
-Some Frequency Sweep test :)
-![Sweep](https://user-images.githubusercontent.com/54714609/82322982-9dfa9c80-99ec-11ea-9e1c-8bb710916de2.gif)
-![SIN](https://user-images.githubusercontent.com/54714609/82323202-f03bbd80-99ec-11ea-81cc-d0b09c403c66.jpg)
-![SQR](https://user-images.githubusercontent.com/54714609/82323208-f3cf4480-99ec-11ea-8527-2cb99277f20d.jpg)
-![TRI](https://user-images.githubusercontent.com/54714609/82323210-f467db00-99ec-11ea-9091-a1c439c01001.jpg)
+```c
+AD983x_SetFrequencyHz(&dds, AD983X_REG_0, 10000);
+```
+
+### Change waveform
+
+```c
+AD983x_SetWaveform(&dds, AD983X_WAVE_TRIANGLE);
+```
+
+### Enable digital square output on AD9834
+
+```c
+AD9834_SetSquareWaveMode(&dds, AD9834_SQUARE_MSB);
+```
+### Power Modes
+
+```c
+AD983x_Wake(&dds);
+AD983x_Sleep(&dds);
+AD983x_DeepSleep(&dds);
+AD983x_DacOff(&dds);
+```
+---
+
+## Hardware Requirements
+
+- Stable **MCLK** source
+- SPI connection
+- Proper analog output filtering
+- Correct reference resistor network
+
+Refer to the official Analog Devices datasheets for recommended hardware connections.
+
+## Examples
+
+Complete example projects are provided in the **examples** folder. The examples are configured for **STM32CubeIDE** and target the **STM32G431KBT6** microcontroller
+
+---
+
+## Datasheets
+[Analog Devices AD9833 Datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ad9833.pdf)
+
+[Analog Devices AD9834 Datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ad9834.pdf)
+
+---
+
+## License
+
+MIT License
